@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FAKE SHOP - 가상 쇼핑 시뮬레이션</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 폰트 및 기본 설정 */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; }
+        
+        /* 모바일 최적화 컨테이너 */
+        #app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 스크롤바 숨기기 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 하단 네비게이션 애니메이션 */
+        .nav-item.active { color: white; }
+        .nav-item.active i { transform: translateY(-2px) scale(1.1); transition: all 0.2s ease; }
+
+        /* 서브 네비게이션 활성화 선 */
+        .sub-nav-active { border-bottom: 3px solid white; font-weight: bold; color: white; }
+
+        /* 토스트 알림 애니메이션 */
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-animate { animation: slideUp 0.3s ease forwards; }
+
+        /* 로딩 스피너 */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* 이미지 스켈레톤 로딩 */
+        .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
+        @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease forwards; }
+
+        /* 타이포 샤인 애니메이션 */
+        @keyframes shine { to { background-position: 200% center; } }
+        .text-shine {
+            background: linear-gradient(to right, #fff 20%, #a1a1aa 40%, #a1a1aa 60%, #fff 80%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: shine 4s linear infinite;
+        }
+
+        /* 텍스트 슬라이드 업 애니메이션 */
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased selection:bg-black selection:text-white">
+
+<div id="app-container">
+    
+    <!-- HEADER 영역 -->
+    <header id="main-header" class="bg-black text-white w-full z-20 shrink-0">
+        <!-- 상단: 로고 및 아이콘 -->
+        <div class="flex justify-between items-center p-4 pb-2">
+            <h1 class="text-2xl font-bold tracking-tighter">FAKE SHOP</h1>
+            <div class="flex items-center space-x-4 text-xl">
+                <button onclick="showToast('새로운 알림이 없습니다.')"><i class="fa-regular fa-bell"></i></button>
+                <button onclick="openCart()" class="relative">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    <span id="cart-badge" class="absolute -top-1 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center hidden">0</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 중단: 검색바 -->
+        <div class="px-4 pb-3">
+            <form id="search-form" class="relative">
+                <input type="text" id="search-input" placeholder="검색어를 입력하세요 (예: 빈티지 카메라)" class="w-full bg-white text-black rounded-full py-2.5 px-4 pr-10 outline-none text-sm font-medium">
+                <button type="submit" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- 하단: 서브 네비게이션 -->
+        <div class="flex overflow-x-auto no-scrollbar px-2 text-gray-400 text-sm whitespace-nowrap border-b border-gray-800" id="home-sub-nav">
+            <button id="sub-tab-content" onclick="switchHomeSubTab('content')" class="px-4 py-2 sub-tab-btn hover:text-white transition-colors">콘텐츠</button>
+            <button id="sub-tab-recommend" onclick="switchHomeSubTab('recommend')" class="px-4 py-2 sub-tab-btn sub-nav-active font-bold text-white transition-colors">추천</button>
+            <button id="sub-tab-ranking" onclick="switchHomeSubTab('ranking')" class="px-4 py-2 sub-tab-btn hover:text-white transition-colors">랭킹</button>
+            <button id="sub-tab-sale" onclick="switchHomeSubTab('sale')" class="px-4 py-2 sub-tab-btn hover:text-white transition-colors">세일</button>
+            <button id="sub-tab-coupon" onclick="switchHomeSubTab('coupon')" class="px-4 py-2 sub-tab-btn hover:text-white transition-colors relative">
+                쿠폰<span id="coupon-badge" class="absolute top-2 right-1 w-1.5 h-1.5 bg-red-500 rounded-full hidden"></span>
+            </button>
+            <button id="sub-tab-message" onclick="switchHomeSubTab('message')" class="px-4 py-2 sub-tab-btn hover:text-white transition-colors relative">
+                메세지<span id="message-badge" class="absolute top-2 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full hidden"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN 콘텐츠 영역 (스크롤 가능) -->
+    <main class="flex-1 overflow-y-auto no-scrollbar relative bg-white pb-20" id="main-content">
+        
+        <!-- 1. HOME 뷰 (기본) -->
+        <div id="view-home" class="view-section block">
+            
+            <!-- [추천] 서브 뷰 (기본 활성화) -->
+            <div id="home-recommend" class="home-sub-view block">
+                <!-- 메인 배너 (상품광고 -> 기업 비전) -->
+                <div id="main-banner" onclick="openCompanyInfo()" class="w-full h-48 bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center text-white mb-6 relative overflow-hidden shadow-inner cursor-pointer group">
+                    <div class="absolute inset-0 bg-black opacity-40 group-hover:opacity-60 transition duration-500"></div>
+                    <div class="z-10 text-center transform group-hover:scale-105 transition duration-500">
+                        <h2 class="text-3xl font-black tracking-tight mb-2 text-shine">FAKE SHOP</h2>
+                        <p class="text-sm font-light text-gray-300">세상에 없던 시뮬레이션, 페이크샵</p>
+                    </div>
+                </div>
+
+                <!-- 추천 상품 섹션 (검색 결과 및 카테고리 뷰 시 제목용) -->
+                <div class="px-4 mb-4">
+                    <h2 id="home-section-title" class="text-xl font-bold mb-4 hidden">추천 상품</h2>
+                    <div id="product-grid" class="w-full">
+                        <!-- 상품 아이템들이 자바스크립트로 렌더링 됩니다. -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- [콘텐츠] 서브 뷰 -->
+            <div id="home-content" class="home-sub-view hidden p-4">
+                <div class="bg-blue-50 p-6 rounded-2xl flex flex-col items-center justify-center text-center shadow-sm">
+                    <i class="fa-solid fa-chart-pie text-4xl text-blue-400 mb-3"></i>
+                    <h2 class="text-xl font-bold mb-2">내 소비습관 점검하기</h2>
+                    <p class="text-sm text-gray-500 mb-4">페이크샵에서 나는 얼마나 지출했을까?<br>가장 좋아하는 카테고리를 확인해보세요.</p>
+                    <button onclick="analyzeHabits()" class="bg-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition w-full shadow-md">점검하기</button>
+                    <div id="habit-result" class="w-full mt-4"></div>
+                </div>
+            </div>
+
+            <!-- [랭킹] 서브 뷰 -->
+            <div id="home-ranking" class="home-sub-view hidden p-4">
+                <h2 class="text-xl font-bold mb-4">오늘의 pick <i class="fa-solid fa-crown text-yellow-400"></i></h2>
+                <div id="ranking-grid" class="flex flex-col space-y-4">
+                    <!-- 랭킹 렌더링 -->
+                </div>
+            </div>
+
+            <!-- [세일] 서브 뷰 -->
+            <div id="home-sale" class="home-sub-view hidden p-4">
+                <h2 class="text-xl font-bold mb-4 text-red-500"><i class="fa-solid fa-bolt"></i> 타임 특가 세일</h2>
+                <div id="sale-grid" class="grid grid-cols-2 gap-4">
+                    <!-- 세일 렌더링 -->
+                </div>
+            </div>
+
+            <!-- [쿠폰] 서브 뷰 -->
+            <div id="home-coupon" class="home-sub-view hidden p-4 bg-gray-50 h-full min-h-[500px]">
+                <h2 class="text-xl font-bold mb-4">이달의 혜택</h2>
+                <div id="coupon-list" class="flex flex-col space-y-3">
+                    <!-- 쿠폰 렌더링 -->
+                </div>
+            </div>
+
+            <!-- [메세지] 서브 뷰 -->
+            <div id="home-message" class="home-sub-view hidden bg-gray-50 h-full flex flex-col min-h-[500px]">
+                <div class="p-4 bg-white border-b flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white text-lg"><i class="fa-solid fa-shop"></i></div>
+                    <div>
+                        <div class="font-bold">페이크샵 공식 스토어</div>
+                        <div class="text-xs text-gray-400">판매자</div>
+                    </div>
+                </div>
+                <div id="message-container" class="p-4 flex-1 overflow-y-auto space-y-4 text-sm flex flex-col pb-20">
+                    <!-- 동적 메세지 렌더링 영역 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. CATEGORY 뷰 -->
+        <div id="view-category" class="view-section hidden p-4">
+            <h2 class="text-xl font-bold mb-4">카테고리</h2>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="filterCategory('패션')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-shirt text-2xl mb-2 text-gray-700"></i>패션</button>
+                <button onclick="filterCategory('인테리어소품')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-couch text-2xl mb-2 text-gray-700"></i>인테리어소품</button>
+                <button onclick="filterCategory('식료품')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-apple-whole text-2xl mb-2 text-gray-700"></i>식료품</button>
+                <button onclick="filterCategory('가전제품')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-tv text-2xl mb-2 text-gray-700"></i>가전제품</button>
+                <button onclick="filterCategory('화장품')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-spray-can text-2xl mb-2 text-gray-700"></i>화장품</button>
+                <button onclick="filterCategory('그 외')" class="bg-gray-100 py-6 rounded-lg font-bold flex flex-col items-center transition hover:bg-gray-200"><i class="fa-solid fa-box-open text-2xl mb-2 text-gray-700"></i>그 외</button>
+            </div>
+        </div>
+
+        <!-- 3. LIKES 뷰 -->
+        <div id="view-likes" class="view-section hidden p-4">
+            <h2 class="text-xl font-bold mb-4">좋아요 <span id="likes-count" class="text-gray-400 text-sm font-normal">0</span></h2>
+            <div id="likes-grid" class="grid grid-cols-2 gap-4">
+                <!-- 찜한 상품 렌더링 -->
+            </div>
+            <div id="likes-empty" class="hidden flex flex-col items-center justify-center py-20 text-gray-400">
+                <i class="fa-regular fa-heart text-5xl mb-4"></i>
+                <p>마음에 드는 상품을 하트로 찜해보세요.</p>
+            </div>
+        </div>
+
+        <!-- 4. MY 뷰 -->
+        <div id="view-my" class="view-section hidden bg-gray-50 h-full">
+            <div class="bg-white p-6 rounded-b-3xl shadow-sm mb-4">
+                <div class="flex items-center space-x-4 mb-6">
+                    <div id="user-avatar-container" class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-2xl overflow-hidden border border-gray-100">
+                        <span id="user-avatar-emoji">😎</span>
+                        <img id="user-avatar-img" src="" class="w-full h-full object-cover hidden">
+                    </div>
+                    <div>
+                        <h2 id="user-nickname-display" class="text-xl font-bold">VVIP 고객님</h2>
+                    </div>
+                </div>
+                <!-- 보유 가상 적립금 제거 후 페이크샵 적립금으로 변경 -->
+                <div class="bg-black text-white p-4 rounded-xl flex justify-between items-center shadow-lg">
+                    <span class="text-sm">페이크샵 적립금 <i class="fa-solid fa-circle-info ml-1 text-gray-400 text-xs"></i></span>
+                    <span id="user-points" class="text-2xl font-bold">0 원</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 mb-4">
+                <h3 class="font-bold mb-3">쇼핑 내역</h3>
+                <div class="flex justify-around text-center border-b pb-4">
+                    <div><div class="font-bold text-xl" id="stat-cart">0</div><div class="text-xs text-gray-500 mt-1">장바구니</div></div>
+                    <div><div class="font-bold text-xl" id="stat-order">0</div><div class="text-xs text-gray-500 mt-1">결제완료</div></div>
+                    <div><div class="font-bold text-xl text-blue-500" id="stat-delivered">0</div><div class="text-xs text-gray-500 mt-1">배송완료</div></div>
+                </div>
+            </div>
+
+            <div class="bg-white px-4 py-2">
+                <button onclick="openProfileModal()" class="w-full text-left py-4 border-b flex justify-between items-center hover:bg-gray-50 transition">
+                    <span>내 정보 수정</span><i class="fa-solid fa-chevron-right text-gray-300"></i>
+                </button>
+                <button onclick="openMyCouponsModal()" class="w-full text-left py-4 border-b flex justify-between items-center hover:bg-gray-50 transition">
+                    <span>쿠폰함</span><i class="fa-solid fa-chevron-right text-gray-300"></i>
+                </button>
+                <button onclick="openCollectionModal()" class="w-full text-left py-4 border-b flex justify-between items-center hover:bg-gray-50 transition">
+                    <span>컬렉션 <span class="text-xs text-gray-400 ml-1">(내 구매 상품)</span></span><i class="fa-solid fa-chevron-right text-gray-300"></i>
+                </button>
+                <button class="w-full text-left py-4 flex justify-between items-center hover:bg-gray-50 transition" onclick="resetData()">
+                    <span class="text-red-500">데이터 초기화</span><i class="fa-solid fa-rotate-right text-gray-300"></i>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER (하단 네비게이션) -->
+    <footer class="bg-black text-gray-400 absolute bottom-0 w-full h-16 flex justify-around items-center shrink-0 z-20 pb-safe">
+        <button onclick="switchTab('category')" id="tab-category" class="nav-item flex flex-col items-center justify-center w-full h-full">
+            <i class="fa-solid fa-bars text-xl mb-1"></i>
+            <span class="text-[10px]">카테고리</span>
+        </button>
+        <button onclick="switchTab('home')" id="tab-home" class="nav-item active flex flex-col items-center justify-center w-full h-full text-white">
+            <i class="fa-solid fa-house text-xl mb-1"></i>
+            <span class="text-[10px]">홈</span>
+        </button>
+        <button onclick="switchTab('likes')" id="tab-likes" class="nav-item flex flex-col items-center justify-center w-full h-full">
+            <i class="fa-regular fa-heart text-xl mb-1"></i>
+            <span class="text-[10px]">좋아요</span>
+        </button>
+        <button onclick="switchTab('my')" id="tab-my" class="nav-item flex flex-col items-center justify-center w-full h-full">
+            <i class="fa-regular fa-user text-xl mb-1"></i>
+            <span class="text-[10px]">마이</span>
+        </button>
+    </footer>
+
+    <!-- 장바구니 모달 -->
+    <div id="cart-modal" class="absolute inset-0 bg-black bg-opacity-50 z-50 hidden flex flex-col justify-end">
+        <div class="bg-white w-full h-[80%] rounded-t-3xl shadow-xl flex flex-col transform transition-transform translate-y-full" id="cart-modal-content">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h2 class="text-xl font-bold">장바구니</h2>
+                <button onclick="closeCart()" class="text-2xl text-gray-500">&times;</button>
+            </div>
+            <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <!-- 장바구니 아이템 -->
+            </div>
+            <div class="p-4 bg-white border-t border-gray-200 shrink-0">
+                <div class="flex justify-between mb-4 text-lg">
+                    <span class="font-bold">총 결제예상금액</span>
+                    <span id="cart-total" class="font-bold text-red-500">0원</span>
+                </div>
+                <button id="checkout-btn" class="w-full bg-black text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition">
+                    결제하기 0원
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 알림 컨테이너 -->
+    <div id="toast-container" class="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-[90%] z-50 flex flex-col items-center space-y-2"></div>
+
+    <!-- 전체 화면 로딩 오버레이 (AI 생성시) -->
+    <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-90 z-[60] hidden flex-col items-center justify-center">
+        <div class="loader mb-4"></div>
+        <p class="text-lg font-bold text-gray-800">상품을 찾고 있습니다...</p>
+        <p class="text-sm text-gray-500 mt-2">잠시만 기다려주세요.</p>
+    </div>
+
+    <!-- 프로필 수정 모달 -->
+    <div id="profile-modal" class="absolute inset-0 bg-black bg-opacity-50 z-[70] hidden flex flex-col justify-end">
+        <div class="bg-white w-full rounded-t-3xl shadow-xl flex flex-col transform transition-transform translate-y-full" id="profile-modal-content">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h2 class="text-xl font-bold">내 정보 수정</h2>
+                <button onclick="closeProfileModal()" class="text-2xl text-gray-500">&times;</button>
+            </div>
+            <div class="p-6 flex flex-col items-center space-y-6 pb-10">
+                <div class="relative w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-4xl overflow-hidden border border-gray-300 shadow-sm">
+                    <span id="edit-avatar-emoji">😎</span>
+                    <img id="edit-avatar-img" src="" class="w-full h-full object-cover hidden">
+                    <label for="avatar-upload" class="absolute bottom-0 w-full h-1/3 bg-black bg-opacity-60 text-white text-[10px] font-bold flex justify-center items-center cursor-pointer hover:bg-opacity-80 transition">변경</label>
+                    <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="previewAvatar(event)">
+                </div>
+                <div class="w-full">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">닉네임</label>
+                    <input type="text" id="edit-nickname" class="w-full border border-gray-300 rounded-xl py-3 px-4 outline-none focus:border-black focus:ring-1 focus:ring-black transition" placeholder="닉네임을 입력하세요">
+                </div>
+                <button onclick="saveProfile()" class="w-full bg-black text-white py-4 rounded-xl font-bold text-lg mt-2 shadow-lg hover:bg-gray-800 transition">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 컬렉션 모달 -->
+    <div id="collection-modal" class="absolute inset-0 bg-black bg-opacity-50 z-[70] hidden flex flex-col justify-end">
+        <div class="bg-white w-full h-[90%] rounded-t-3xl shadow-xl flex flex-col transform transition-transform translate-y-full" id="collection-modal-content">
+            <div class="p-4 border-b flex justify-between items-center shrink-0">
+                <h2 class="text-xl font-bold">마이 컬렉션</h2>
+                <button onclick="closeCollectionModal()" class="text-2xl text-gray-500">&times;</button>
+            </div>
+            <div id="collection-items" class="flex-1 overflow-y-auto p-4 flex flex-col bg-gray-50 content-start">
+                <!-- 구매한 상품들 렌더링 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 쿠폰함 모달 -->
+    <div id="my-coupons-modal" class="absolute inset-0 bg-black bg-opacity-50 z-[70] hidden flex flex-col justify-end">
+        <div class="bg-white w-full h-[80%] rounded-t-3xl shadow-xl flex flex-col transform transition-transform translate-y-full" id="my-coupons-content">
+            <div class="p-4 border-b flex justify-between items-center shrink-0">
+                <h2 class="text-xl font-bold">내 쿠폰함</h2>
+                <button onclick="closeMyCouponsModal()" class="text-2xl text-gray-500">&times;</button>
+            </div>
+            <div id="my-coupons-list" class="flex-1 overflow-y-auto p-4 flex flex-col space-y-3 bg-gray-50 content-start">
+                <!-- 내 쿠폰 렌더링 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 상품 상세 모달 -->
+    <div id="product-detail-modal" class="absolute inset-0 bg-white z-[70] hidden flex-col transform transition-transform translate-x-full overflow-hidden">
+        <div class="relative w-full h-2/3 bg-gray-100 shrink-0">
+            <button onclick="closeProductDetail()" class="absolute top-4 left-4 z-10 w-10 h-10 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-md">
+                <i class="fa-solid fa-arrow-left text-lg"></i>
+            </button>
+            <img id="detail-img" src="" alt="상품 이미지" class="w-full h-full object-cover">
+        </div>
+        <div class="p-6 flex-1 bg-white rounded-t-3xl -mt-6 relative z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] overflow-y-auto">
+            <div class="text-sm font-bold text-gray-400 mb-1" id="detail-category">카테고리</div>
+            <h2 class="text-2xl font-bold mb-2 leading-tight" id="detail-name">상품명</h2>
+            <div class="flex items-center space-x-2 mb-4">
+                <div class="text-yellow-400 text-sm"><i class="fa-solid fa-star"></i> <span id="detail-rating" class="font-bold text-gray-700">0.0</span></div>
+                <div class="text-sm text-gray-400 underline cursor-pointer">리뷰 <span id="detail-reviews">0</span>개</div>
+            </div>
+            <div class="text-3xl font-extrabold text-black mb-6" id="detail-price">0원</div>
+            <div class="border-t pt-4">
+                <h3 class="font-bold text-lg mb-2">상품 설명</h3>
+                <p class="text-gray-600 text-sm leading-relaxed" id="detail-description">상품 설명이 여기에 표시됩니다.</p>
+            </div>
+            <div class="flex items-center justify-between border-t border-gray-100 pt-4 mt-4">
+                <span class="font-bold text-gray-700">구매 수량</span>
+                <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                    <button onclick="changeDetailQty(-1)" class="px-4 py-1.5 text-gray-500 hover:bg-gray-100 text-lg font-bold transition">-</button>
+                    <span id="detail-qty-display" class="px-4 font-bold text-sm border-x border-gray-300 py-1.5">1</span>
+                    <button onclick="changeDetailQty(1)" class="px-4 py-1.5 text-gray-500 hover:bg-gray-100 text-lg font-bold transition">+</button>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 bg-white border-t border-gray-100 flex space-x-3 shrink-0 pb-safe">
+            <button id="detail-btn-cart" class="flex-1 bg-white border border-gray-300 text-black py-4 rounded-xl font-bold text-lg hover:bg-gray-50 transition shadow-sm">
+                장바구니 담기
+            </button>
+            <button id="detail-btn-buy" class="flex-1 bg-black text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition">
+                바로 구매하기
+            </button>
+        </div>
+    </div>
+
+    <!-- 주문서 모달 (새로운 창) -->
+    <div id="order-form-modal" class="absolute inset-0 bg-gray-50 z-[80] hidden flex-col transform transition-transform translate-y-full">
+        <div class="bg-white p-4 border-b flex items-center shrink-0 shadow-sm relative z-10">
+            <button onclick="closeOrderForm()" class="absolute left-4 text-2xl text-gray-600"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2 class="text-xl font-bold w-full text-center">주문서</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
+            <!-- 주문자 정보 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-3 text-lg flex items-center"><i class="fa-solid fa-user text-gray-400 mr-2 text-sm"></i> 주문자 정보</h3>
+                <div class="flex justify-between items-center text-sm border-t border-gray-50 pt-3">
+                    <span class="text-gray-500">닉네임</span>
+                    <span class="font-bold text-black" id="order-nickname"></span>
+                </div>
+                <div class="mt-3">
+                    <input type="text" id="order-contact" placeholder="연락처 (예: 010-0000-0000)" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition">
+                </div>
+            </div>
+            
+            <!-- 배송지 정보 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-3">
+                <h3 class="font-bold mb-1 text-lg flex items-center"><i class="fa-solid fa-location-dot text-gray-400 mr-2 text-sm"></i> 배송지 정보</h3>
+                <input type="text" id="order-address" placeholder="예: 충북 청주시 서원구 충대로 1" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition">
+                <select id="order-request" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition bg-white appearance-none cursor-pointer" onchange="toggleCustomRequest()">
+                    <option value="문앞에 놔주세요">문앞에 놔주세요</option>
+                    <option value="경비실에 맡겨주세요">경비실에 맡겨주세요</option>
+                    <option value="택배함에 넣어주세요">택배함에 넣어주세요</option>
+                    <option value="직접입력">직접입력</option>
+                </select>
+                <input type="text" id="order-custom-request" placeholder="요청사항을 직접 입력하세요" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition hidden">
+            </div>
+
+            <!-- 주문 상품 내역 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-3 text-lg flex items-center"><i class="fa-solid fa-box text-gray-400 mr-2 text-sm"></i> 주문 상품 내역</h3>
+                <div id="order-items-container" class="space-y-4 border-t border-gray-50 pt-3">
+                    <!-- 동적 렌더링 -->
+                </div>
+            </div>
+
+            <!-- 쿠폰 사용 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-3 text-lg flex items-center"><i class="fa-solid fa-ticket text-gray-400 mr-2 text-sm"></i> 쿠폰 사용</h3>
+                <select id="order-coupon" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition bg-white appearance-none text-black font-bold cursor-pointer" onchange="calcOrderTotal()">
+                    <option value="0">적용 안 함</option>
+                    <!-- 동적 렌더링 -->
+                </select>
+            </div>
+
+            <!-- 적립금 사용 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-3 text-lg flex items-center"><i class="fa-solid fa-coins text-yellow-400 mr-2 text-sm"></i> 적립금 사용</h3>
+                <div class="flex items-center space-x-2 border-t border-gray-50 pt-3">
+                    <input type="number" id="order-use-points" placeholder="0" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition" oninput="applyPoints()">
+                    <button onclick="useAllPoints()" class="shrink-0 bg-black text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-md hover:bg-gray-800 transition">전액사용</button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">보유 적립금: <span id="order-avail-points" class="font-bold text-black">0</span>원</p>
+                <p class="text-xs text-blue-500 mt-1 font-bold">* 결제 시 최종 금액의 5%가 새롭게 적립됩니다.</p>
+            </div>
+
+            <!-- 결제 방식 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <h3 class="font-bold text-lg flex items-center"><i class="fa-solid fa-credit-card text-gray-400 mr-2 text-sm"></i> 결제 방식</h3>
+                <div class="flex space-x-2 border-t border-gray-50 pt-3">
+                    <button id="pay-method-virtual" onclick="selectPaymentMethod('virtual')" class="flex-1 py-3 border-2 border-black bg-black text-white rounded-xl text-sm font-bold transition">가상계좌</button>
+                    <button id="pay-method-transfer" onclick="selectPaymentMethod('transfer')" class="flex-1 py-3 border-2 border-gray-200 text-gray-500 bg-white rounded-xl text-sm font-bold transition hover:bg-gray-50">무통장입금</button>
+                </div>
+                <input type="text" id="order-account" placeholder="본인 계좌 정보를 입력하세요 (예: 농협 000-0000-0000-00)" class="w-full border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black transition">
+                <label class="flex items-center space-x-2 text-sm text-gray-700 mt-2 bg-gray-50 p-3 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition">
+                    <input type="checkbox" class="rounded border-gray-300 w-4 h-4 text-black focus:ring-black cursor-pointer">
+                    <span class="font-bold">현금영수증 발급 신청</span>
+                </label>
+            </div>
+        </div>
+        <!-- 결제 버튼 (하단 고정) -->
+        <div class="p-5 bg-white border-t border-gray-100 shrink-0 absolute bottom-0 w-full z-10 pb-safe shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
+            <button onclick="submitOrder()" id="order-submit-btn" class="w-full bg-black text-white py-4 rounded-xl font-bold text-lg shadow-xl hover:bg-gray-800 transition flex justify-center items-center space-x-2">
+                <span id="order-final-btn-text">0원 결제하기</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 1단계: 지문 인증 모달 -->
+    <div id="auth-fingerprint-modal" class="absolute inset-0 bg-white z-[90] hidden flex-col items-center justify-center transform transition-transform translate-y-full">
+        <div class="text-center w-full">
+            <h2 class="text-2xl font-bold mb-2">결제 인증</h2>
+            <p class="text-gray-500 mb-10 text-sm">안전한 결제를 위해 지문을 인식해주세요.</p>
+            <button onclick="passFingerprint()" class="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center text-5xl text-blue-500 shadow-inner relative overflow-hidden group hover:bg-blue-50 transition animate-pulse">
+                <i class="fa-solid fa-fingerprint relative z-10"></i>
+                <div class="absolute inset-0 bg-blue-100 opacity-0 group-hover:opacity-50 transition rounded-full"></div>
+            </button>
+            <p class="text-xs text-gray-400 mt-6">(아이콘을 클릭하세요)</p>
+        </div>
+        <button onclick="closeAuth()" class="absolute bottom-10 text-gray-500 font-bold underline">취소</button>
+    </div>
+
+    <!-- 2단계: 간편 비밀번호 모달 -->
+    <div id="auth-passcode-modal" class="absolute inset-0 bg-white z-[90] hidden flex-col items-center justify-between pt-20 pb-10 transform transition-transform translate-x-full">
+        <div class="text-center w-full">
+            <h2 class="text-xl font-bold mb-2">간편 비밀번호 입력</h2>
+            <p class="text-gray-500 text-sm mb-8">결제 비밀번호 6자리를 입력해주세요.</p>
+            <div class="flex justify-center space-x-3 mb-10" id="passcode-dots">
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+                <div class="w-4 h-4 bg-gray-200 rounded-full passcode-dot transition-colors"></div>
+            </div>
+        </div>
+        
+        <!-- 키패드 -->
+        <div class="w-full px-8 grid grid-cols-3 gap-y-6 gap-x-4 text-2xl font-bold text-center">
+            <button onclick="inputPasscode('1')" class="py-4 hover:bg-gray-100 rounded-2xl transition">1</button>
+            <button onclick="inputPasscode('2')" class="py-4 hover:bg-gray-100 rounded-2xl transition">2</button>
+            <button onclick="inputPasscode('3')" class="py-4 hover:bg-gray-100 rounded-2xl transition">3</button>
+            <button onclick="inputPasscode('4')" class="py-4 hover:bg-gray-100 rounded-2xl transition">4</button>
+            <button onclick="inputPasscode('5')" class="py-4 hover:bg-gray-100 rounded-2xl transition">5</button>
+            <button onclick="inputPasscode('6')" class="py-4 hover:bg-gray-100 rounded-2xl transition">6</button>
+            <button onclick="inputPasscode('7')" class="py-4 hover:bg-gray-100 rounded-2xl transition">7</button>
+            <button onclick="inputPasscode('8')" class="py-4 hover:bg-gray-100 rounded-2xl transition">8</button>
+            <button onclick="inputPasscode('9')" class="py-4 hover:bg-gray-100 rounded-2xl transition">9</button>
+            <button onclick="closeAuth()" class="py-4 text-gray-400 text-sm font-normal hover:bg-gray-100 rounded-2xl transition">취소</button>
+            <button onclick="inputPasscode('0')" class="py-4 hover:bg-gray-100 rounded-2xl transition">0</button>
+            <button onclick="deletePasscode()" class="py-4 hover:bg-gray-100 rounded-2xl transition"><i class="fa-solid fa-delete-left"></i></button>
+        </div>
+    </div>
+
+    <!-- 3단계: 주문 완료 (로딩/성공) 모달 -->
+    <div id="auth-success-modal" class="absolute inset-0 bg-white z-[100] hidden flex-col items-center justify-center">
+        <div id="auth-loading" class="flex flex-col items-center">
+            <div class="loader mb-4 border-black border-t-transparent w-12 h-12"></div>
+            <p class="font-bold text-gray-800">결제 정보를 확인 중입니다...</p>
+        </div>
+        <div id="auth-check" class="hidden flex-col items-center animate-fade-in">
+            <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white text-4xl mb-4 shadow-lg">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-1">주문이 접수되었습니다</h2>
+            <p class="text-gray-500 text-sm text-center">판매자가 입금을 확인하면<br>결제가 최종 완료됩니다.</p>
+        </div>
+    </div>
+
+    <!-- 기업 설명 모달 -->
+    <div id="company-info-modal" class="absolute inset-0 bg-black z-[110] hidden flex-col items-center justify-center text-white overflow-hidden opacity-0 transition-opacity duration-500">
+        <button onclick="closeCompanyInfo()" class="absolute top-6 right-6 text-3xl text-gray-400 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
+        <div class="px-8 text-center w-full max-w-sm">
+            <div class="mb-10 animate-slide-up" style="animation-delay: 0.2s; opacity: 0;">
+                <i class="fa-solid fa-fingerprint text-5xl text-blue-500 mb-6 opacity-80"></i>
+                <h2 class="text-3xl font-black leading-tight mb-4 tracking-tighter">가상으로 느끼는<br><span class="text-blue-500">큰 만족감,</span><br>우리는 그것을<br>실현시킵니다.</h2>
+            </div>
+            <div class="space-y-4 text-gray-400 text-sm font-light animate-slide-up" style="animation-delay: 0.6s; opacity: 0;">
+                <p>현대인의 소비는 물건 그 자체보다<br>'소비하는 행위'에서 오는 쾌감에 집중되어 있습니다.</p>
+                <p>페이크샵은 실제 지출 없이도 완벽한<br>쇼핑의 도파민을 선사하는 <b>디지털 디톡스 솔루션</b>입니다.</p>
+            </div>
+            <div class="mt-16 animate-slide-up" style="animation-delay: 1.0s; opacity: 0;">
+                <div class="w-12 h-1 bg-white mx-auto mb-4"></div>
+                <p class="font-bold tracking-widest text-xs">FAKE SHOP TEAM</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- 설정 및 API 정보 ---
+    const apiKey = ""; // Gemini API 키 (실행 환경에서 주입됨)
+
+    // --- 더미 데이터 (초기 상품) ---
+    // 추천 상품 라인업 (각 카테고리별 4개 이상으로 대폭 추가)
+    const initialProducts = [
+        { id: 'p2', name: '빈티지 감성 우드 스탠드', price: 54000, category: '인테리어소품', img: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=400&q=80', desc: '공간에 따뜻한 분위기를 더해주는 빈티지한 매력의 우드 조명입니다. 침실이나 거실의 무드등으로 활용하기 좋습니다.', rating: '4.8', reviews: 852 },
+        { id: 'p3', name: '프리미엄 노이즈캔슬링 헤드폰', price: 320000, category: '가전제품', img: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?auto=format&fit=crop&w=400&q=80', desc: '완벽한 몰입을 위한 최고급 노이즈 캔슬링 기술이 적용된 헤드폰입니다. 원음 그대로의 풍부한 사운드를 경험하세요.', rating: '4.9', reviews: 1205 },
+        { id: 'p4', name: '유기농 수제 그래놀라 세트', price: 18000, category: '식료품', img: 'https://images.unsplash.com/photo-1517673400267-0251440c45dc?auto=format&fit=crop&w=400&q=80', desc: '건강한 재료만 엄선하여 오븐에서 정성껏 구워낸 수제 그래놀라입니다. 바쁜 아침, 든든하고 맛있는 한 끼를 챙겨보세요.', rating: '4.5', reviews: 420 },
+        { id: 'p5', name: '시그니처 니치 향수 50ml', price: 120000, category: '화장품', img: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=400&q=80', desc: '고급스럽고 유니크한 향으로 하루 종일 기분 좋은 잔향을 남깁니다.', rating: '4.9', reviews: 650 },
+        { id: 'p6', name: '스마트 피트니스 워치', price: 210000, category: '가전제품', img: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=400&q=80', desc: '건강 관리부터 스마트 알림까지, 당신의 일상을 업그레이드 해줄 스마트 워치.', rating: '4.7', reviews: 890 },
+        { id: 'p7', name: '홈카페 캡슐 커피머신', price: 159000, category: '가전제품', img: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=400&q=80', desc: '버튼 한 번으로 완성되는 완벽한 크레마. 우리 집을 근사한 카페로 만들어보세요.', rating: '4.8', reviews: 1120 },
+        { id: 'p8', name: '클래식 뿔테 선글라스', price: 45000, category: '패션', img: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80', desc: '자외선 차단은 기본, 어떤 얼굴형에도 잘 어울리는 클래식한 디자인입니다.', rating: '4.6', reviews: 340 },
+        { id: 'p9', name: '북유럽풍 페르시안 러그', price: 78000, category: '인테리어소품', img: 'https://images.unsplash.com/photo-1600166898405-da9535204843?auto=format&fit=crop&w=400&q=80', desc: '공간의 분위기를 확 바꿔주는 감성적인 패턴의 고품질 러그입니다.', rating: '4.7', reviews: 560 },
+        
+        // --- 신규 추가 상품 ---
+        { id: 'p10', name: '퓨어 캐시미어 머플러', price: 89000, category: '패션', img: 'https://images.unsplash.com/photo-1457545195570-67f207084966?auto=format&fit=crop&w=400&q=80', desc: '가볍고 따뜻한 100% 캐시미어. 겨울철 포근한 스타일링을 완성하세요.', rating: '4.8', reviews: 412 },
+        { id: 'p11', name: '클래식 레더 크로스백', price: 150000, category: '패션', img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=400&q=80', desc: '시간이 지날수록 멋이 더해지는 천연 가죽 소재의 미니멀 크로스백입니다.', rating: '4.9', reviews: 258 },
+        { id: 'p12', name: '천연 아로마 디퓨저 세트', price: 34000, category: '인테리어소품', img: 'https://images.unsplash.com/photo-1608528577891-eb055944f2e7?auto=format&fit=crop&w=400&q=80', desc: '자연에서 추출한 은은한 향기로 지친 일상에 편안한 휴식을 선물합니다.', rating: '4.7', reviews: 630 },
+        { id: 'p13', name: '스페셜티 드립백 커피 10ea', price: 22000, category: '식료품', img: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&w=400&q=80', desc: '전문 바리스타가 로스팅한 신선한 원두. 언제 어디서나 향긋하게 즐기세요.', rating: '4.9', reviews: 1104 },
+        { id: 'p14', name: '수제 생초콜릿 에디션', price: 35000, category: '식료품', img: 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=400&q=80', desc: '입안에서 부드럽게 녹아내리는 진한 카카오의 풍미. 특별한 날을 위한 디저트.', rating: '4.8', reviews: 880 },
+        { id: 'p15', name: '유기농 올리브오일', price: 42000, category: '식료품', img: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80', desc: '최상급 올리브만 압착하여 만든 건강한 오일. 샐러드에 완벽한 풍미를 더해줍니다.', rating: '4.7', reviews: 450 },
+        { id: 'p16', name: '미니 스마트 빔프로젝터', price: 289000, category: '가전제품', img: 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=400&q=80', desc: '내 방을 나만의 영화관으로. 작지만 선명한 화질을 자랑하는 스마트 프로젝터.', rating: '4.6', reviews: 760 },
+        { id: 'p17', name: '비건 진정 수분 크림', price: 38000, category: '화장품', img: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&w=400&q=80', desc: '민감한 피부도 안심! 순한 식물성 성분으로 피부 깊숙이 수분을 채워줍니다.', rating: '4.8', reviews: 920 },
+        { id: 'p18', name: '벨벳 매트 립스틱 세트', price: 56000, category: '화장품', img: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=400&q=80', desc: '가볍게 밀착되어 오랜 시간 유지되는 생생한 컬러감의 립스틱 컬렉션.', rating: '4.7', reviews: 540 },
+        { id: 'p19', name: '프리미엄 논슬립 요가매트', price: 48000, category: '그 외', img: 'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?auto=format&fit=crop&w=400&q=80', desc: '뛰어난 그립감과 쿠션감으로 안전한 홈트레이닝을 도와주는 요가매트.', rating: '4.9', reviews: 315 },
+        { id: 'p20', name: '감성 캠핑 LED 랜턴', price: 65000, category: '그 외', img: 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?auto=format&fit=crop&w=400&q=80', desc: '아날로그 감성 디자인에 편리한 충전 방식. 캠핑의 밤을 더욱 낭만적으로.', rating: '4.8', reviews: 410 },
+        { id: 'p21', name: '커스텀 우드 만년필', price: 120000, category: '그 외', img: 'https://images.unsplash.com/photo-1585336261022-680e295ce3fe?auto=format&fit=crop&w=400&q=80', desc: '손끝에 전해지는 묵직한 나무의 질감. 당신의 소중한 기록을 함께합니다.', rating: '4.9', reviews: 155 },
+        { id: 'p22', name: '아로마 인센스 스틱과 홀더', price: 29000, category: '그 외', img: 'https://images.unsplash.com/photo-1533090368676-1fd25485db88?auto=format&fit=crop&w=400&q=80', desc: '피어오르는 연기를 보며 마음의 평화를 찾아보세요. 세련된 황동 홀더 포함.', rating: '4.7', reviews: 290 }
+    ];
+
+    // --- 세일 전용 상품 데이터 ---
+    const saleProductsData = [
+        { id: 's1', name: '[창고대방출] 라운지 소파 체어', originalPrice: 150000, price: 45000, isSale: true, category: '인테리어소품', img: 'https://images.unsplash.com/photo-1506898667547-42e22a46e125?auto=format&fit=crop&w=400&q=80', desc: '70% 파격 할인! 한정 수량 안락한 1인용 소파 체어입니다.', rating: '4.7', reviews: 310 },
+        { id: 's2', name: '[시즌오프] 프리미엄 꽈배기 니트', originalPrice: 89000, price: 29000, isSale: true, category: '패션', img: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=400&q=80', desc: '부드러운 감촉, 트렌디한 디자인의 니트를 원가 이하로 던집니다.', rating: '4.6', reviews: 540 },
+        { id: 's3', name: '[마감임박] 수분 꽉 앰플 3종 세트', originalPrice: 42000, price: 12000, isSale: true, category: '화장품', img: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=400&q=80', desc: '유통기한 임박으로 말도 안 되는 가격! 촉촉한 수분광을 채워보세요.', rating: '4.3', reviews: 120 }
+    ];
+
+    // --- 쿠폰 데이터 ---
+    const generatedCoupons = [
+        { id: 'c1', name: '신규 가입 환영 시크릿 할인', discount: 90 },
+        { id: 'c2', name: '쇼핑 지원금 팍팍 특급 할인', discount: 50 },
+        { id: 'c3', name: '봄맞이 기분 전환 스페셜 할인', discount: 30 },
+        { id: 'c4', name: '배송비 부담 제로 기본 할인', discount: 10 }
+    ];
+
+    // --- 상태 관리 ---
+    let state = {
+        points: 0,
+        likes: [],
+        cart: [],
+        history: [],
+        products: [...initialProducts, ...saleProductsData],
+        user: {
+            nickname: "VVIP 고객님",
+            avatarUrl: null,
+            coupons: []
+        },
+        messages: [],
+        hasUnreadMessages: false,
+        hasUnreadCoupons: true 
+    };
+
+    // --- 초기화 로직 ---
+    function init() {
+        const savedData = localStorage.getItem('fakeShopData');
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            
+            state.points = parsed.points || 0;
+            state.likes = parsed.likes || [];
+            
+            if (parsed.cart && parsed.cart.length > 0 && typeof parsed.cart[0] === 'string') {
+                state.cart = parsed.cart.map(id => ({ id: id, qty: 1 }));
+            } else {
+                state.cart = parsed.cart || [];
+            }
+            
+            state.history = parsed.history || [];
+            if (parsed.products) state.products = parsed.products;
+            if (parsed.user) state.user = parsed.user;
+            if (!state.user.coupons) state.user.coupons = [];
+            state.messages = parsed.messages || [];
+            state.hasUnreadMessages = parsed.hasUnreadMessages || false;
+            
+            if (parsed.hasOwnProperty('hasUnreadCoupons')) {
+                state.hasUnreadCoupons = parsed.hasUnreadCoupons;
+            }
+        }
+        
+        renderProducts();
+        renderMessages();
+        updateUI();
+    }
+
+    function saveData() {
+        localStorage.setItem('fakeShopData', JSON.stringify(state));
+        updateUI();
+    }
+
+    function resetData() {
+        state = { points: 0, likes: [], cart: [], history: [], products: [...initialProducts, ...saleProductsData], user: { nickname: "VVIP 고객님", avatarUrl: null, coupons: [] }, messages: [], hasUnreadMessages: false, hasUnreadCoupons: true };
+        saveData();
+        showToast("데이터가 깔끔하게 초기화되었습니다!");
+        switchTab('home');
+    }
+
+    // --- 유틸리티 함수 ---
+    function formatMoney(num) {
+        return num.toLocaleString() + '원';
+    }
+
+    function generateId() {
+        return 'gen_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // --- UI 렌더링 ---
+    function updateUI() {
+        const badge = document.getElementById('cart-badge');
+        const totalCartItems = state.cart.reduce((sum, item) => sum + item.qty, 0);
+        badge.innerText = totalCartItems;
+        badge.style.display = totalCartItems > 0 ? 'flex' : 'none';
+
+        document.getElementById('user-points').innerText = formatMoney(state.points);
+        document.getElementById('stat-cart').innerText = state.cart.length;
+        document.getElementById('stat-order').innerText = state.history.length;
+        document.getElementById('stat-delivered').innerText = state.history.length;
+
+        document.getElementById('likes-count').innerText = state.likes.length;
+
+        const msgBadge = document.getElementById('message-badge');
+        if (msgBadge) {
+            if (state.hasUnreadMessages) msgBadge.classList.remove('hidden');
+            else msgBadge.classList.add('hidden');
+        }
+
+        const couponBadge = document.getElementById('coupon-badge');
+        if (couponBadge) {
+            if (state.hasUnreadCoupons) couponBadge.classList.remove('hidden');
+            else couponBadge.classList.add('hidden');
+        }
+
+        document.getElementById('user-nickname-display').innerText = state.user.nickname;
+        const avatarEmoji = document.getElementById('user-avatar-emoji');
+        const avatarImg = document.getElementById('user-avatar-img');
+        
+        if (state.user.avatarUrl) {
+            avatarImg.src = state.user.avatarUrl;
+            avatarImg.classList.remove('hidden');
+            avatarEmoji.classList.add('hidden');
+        } else {
+            avatarImg.classList.add('hidden');
+            avatarEmoji.classList.remove('hidden');
+        }
+    }
+
+    // 그리드 & 가로 스와이프 복합 렌더링
+    function renderProducts(categoryFilter = null, specificProducts = null) {
+        const grid = document.getElementById('product-grid');
+        grid.innerHTML = '';
+        
+        let displayProducts = specificProducts ? specificProducts : state.products;
+
+        // --- 그리드 뷰 (카테고리 필터링 또는 검색 결과) ---
+        if (categoryFilter || specificProducts) {
+            grid.className = 'grid grid-cols-2 gap-4 w-full';
+            
+            if (categoryFilter && !specificProducts) {
+                // 세일 상품도 카테고리에 포함되도록 필터링 로직 수정
+                displayProducts = state.products.filter(p => p.category === categoryFilter);
+                if (displayProducts.length === 0) {
+                    grid.innerHTML = `<div class="col-span-2 text-center text-gray-400 py-10">해당 카테고리의 상품이 없습니다.</div>`;
+                    return;
+                }
+            }
+
+            displayProducts.forEach(p => {
+                const isLiked = state.likes.includes(p.id);
+                const saleBadge = p.isSale ? `<div class="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-20 tracking-widest shadow-sm">SALE</div>` : '';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative pb-3 flex flex-col';
+                card.innerHTML = `
+                    ${saleBadge}
+                    <div class="relative w-full h-40 bg-gray-200 cursor-pointer group shrink-0" onclick="openProductDetail('${p.id}')">
+                        <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover transition transform group-hover:scale-105">
+                        <div class="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition"></div>
+                        <button onclick="event.stopPropagation(); toggleLike('${p.id}')" class="absolute bottom-2 right-2 w-8 h-8 bg-white bg-opacity-90 rounded-full flex items-center justify-center text-red-500 shadow-sm z-30 hover:scale-110 transition">
+                            <i class="${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+                        </button>
+                    </div>
+                    <div class="px-3 pt-3 flex-1 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                        <div class="text-xs text-gray-400 mb-1">${p.category}</div>
+                        <div class="text-sm font-bold truncate mb-1">${p.name}</div>
+                    </div>
+                    <div class="px-3 pb-1 flex justify-between items-center shrink-0">
+                        <div class="text-lg font-extrabold text-black cursor-pointer" onclick="openProductDetail('${p.id}')">${formatMoney(p.price)}</div>
+                        <button onclick="event.stopPropagation(); addToCart('${p.id}')" class="text-black p-2 hover:bg-gray-100 rounded-full transition"><i class="fa-solid fa-cart-plus"></i></button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            renderLikes();
+            return;
+        }
+
+        // --- 홈 > 추천 탭 (가로 스크롤 섹션 뷰) ---
+        grid.className = 'flex flex-col space-y-8 pb-10 w-full';
+        
+        // 가로 스크롤 섹션 렌더링 헬퍼 함수
+        const createSection = (title, items) => {
+            if (items.length === 0) return '';
+            
+            let itemsHtml = items.map(p => {
+                const isLiked = state.likes.includes(p.id);
+                const saleBadge = p.isSale ? `<div class="absolute top-0 left-0 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br z-20">SALE</div>` : '';
+
+                return `
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden shrink-0 w-36 relative pb-2 flex flex-col cursor-pointer group" onclick="openProductDetail('${p.id}')">
+                        ${saleBadge}
+                        <div class="relative w-full h-36 bg-gray-200">
+                            <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover transition transform group-hover:scale-105">
+                            <div class="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition"></div>
+                            <button onclick="event.stopPropagation(); toggleLike('${p.id}')" class="absolute bottom-2 right-2 w-8 h-8 bg-white bg-opacity-90 rounded-full flex items-center justify-center text-red-500 shadow-sm z-30 hover:scale-110 transition">
+                                <i class="${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+                            </button>
+                        </div>
+                        <div class="px-2 pt-2 flex-1">
+                            <div class="text-[10px] text-gray-400 mb-0.5 truncate">${p.category}</div>
+                            <div class="text-xs font-bold truncate mb-1">${p.name}</div>
+                        </div>
+                        <div class="px-2 pt-1 flex justify-between items-center shrink-0 mt-auto">
+                            <div class="text-sm font-extrabold text-black">${formatMoney(p.price)}</div>
+                            <button onclick="event.stopPropagation(); addToCart('${p.id}')" class="text-black p-1.5 hover:bg-gray-100 rounded-full transition"><i class="fa-solid fa-cart-plus text-xs"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="animate-fade-in w-full">
+                    <h3 class="font-bold text-lg mb-3 px-1 text-gray-800">${title}</h3>
+                    <div class="flex overflow-x-auto gap-3 no-scrollbar px-1 pb-2 w-full snap-x">
+                        ${itemsHtml}
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = '';
+
+        // 1. 오늘의 pick 상위 상품 (Top 3, 세일 상품도 랭킹에 포함)
+        const top3 = [...state.products].sort((a, b) => parseFloat(b.rating || 4.0) - parseFloat(a.rating || 4.0)).slice(0, 3);
+        html += createSection('👑 오늘의 pick 상위 상품', top3);
+
+        // 2. 관심있는 상품 (좋아요)
+        const likedItems = state.products.filter(p => state.likes.includes(p.id));
+        if (likedItems.length > 0) {
+            html += createSection('❤️ 회원님이 관심 있는 상품', likedItems);
+        }
+
+        // 3. 카테고리별 상품 (센스 있는 문구)
+        const catTitles = {
+            '패션': '✨ 나를 빛내줄 트렌디 패션',
+            '인테리어소품': '🛋️ 공간을 채우는 감성 인테리어',
+            '가전제품': '📺 삶의 질 수직 상승! 스마트 가전',
+            '식료품': '🍎 매일매일 맛있는 소확행',
+            '화장품': '💄 오늘 더 예뻐지는 뷰티템',
+            '그 외': '🎁 놓치기 아쉬운 유니크 아이템'
+        };
+
+        Object.keys(catTitles).forEach(cat => {
+            // 세일 상품도 카테고리 뷰에 포함
+            const catItems = state.products.filter(p => p.category === cat);
+            if (catItems.length > 0) {
+                html += createSection(catTitles[cat], catItems);
+            }
+        });
+
+        grid.innerHTML = html;
+        renderLikes();
+    }
+
+    function renderLikes() {
+        const grid = document.getElementById('likes-grid');
+        const empty = document.getElementById('likes-empty');
+        grid.innerHTML = '';
+        
+        if (state.likes.length === 0) {
+            grid.classList.add('hidden');
+            empty.classList.remove('hidden');
+        } else {
+            grid.classList.remove('hidden');
+            empty.classList.add('hidden');
+            
+            state.likes.forEach(id => {
+                const p = state.products.find(prod => prod.id === id);
+                if (!p) return;
+                
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm border overflow-hidden relative pb-3';
+                card.innerHTML = `
+                    <div class="w-full h-32 bg-gray-200 cursor-pointer" onclick="openProductDetail('${p.id}')">
+                        <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="px-2 pt-2">
+                        <div class="text-xs font-bold truncate cursor-pointer" onclick="openProductDetail('${p.id}')">${p.name}</div>
+                        <div class="text-sm font-extrabold flex justify-between items-center mt-1">
+                            <span class="cursor-pointer" onclick="openProductDetail('${p.id}')">${formatMoney(p.price)}</span>
+                            <button onclick="event.stopPropagation(); toggleLike('${p.id}')" class="text-red-500 p-1"><i class="fa-solid fa-heart"></i></button>
+                        </div>
+                        <button onclick="event.stopPropagation(); addToCart('${p.id}')" class="mt-2 w-full bg-black text-white text-xs py-2 rounded-md font-bold transition hover:bg-gray-800">장바구니 담기</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    }
+
+    function updateCartQty(cartIndex, delta) {
+        const item = state.cart[cartIndex];
+        item.qty += delta;
+        if (item.qty <= 0) {
+            removeFromCart(cartIndex);
+        } else {
+            saveData();
+            renderCart();
+        }
+    }
+
+    function openCart() {
+        renderCart();
+        const modal = document.getElementById('cart-modal');
+        const content = document.getElementById('cart-modal-content');
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('translate-y-full'); }, 10);
+    }
+
+    function closeCart() {
+        const content = document.getElementById('cart-modal-content');
+        content.classList.add('translate-y-full');
+        setTimeout(() => { document.getElementById('cart-modal').classList.add('hidden'); }, 300);
+    }
+
+    function renderCart() {
+        const container = document.getElementById('cart-items');
+        container.innerHTML = '';
+        let total = 0;
+
+        if (state.cart.length === 0) {
+            container.innerHTML = `<div class="text-center text-gray-400 py-10">장바구니가 비어있습니다.</div>`;
+        } else {
+            state.cart.forEach((item, index) => {
+                const p = state.products.find(prod => prod.id === item.id);
+                if(!p) return;
+                total += (p.price * item.qty);
+                const itemEl = document.createElement('div');
+                itemEl.className = 'flex items-center space-x-3 bg-white p-3 rounded-lg shadow-sm border border-gray-100';
+                itemEl.innerHTML = `
+                    <img src="${p.img}" class="w-16 h-16 rounded-lg object-cover border border-gray-50">
+                    <div class="flex-1">
+                        <div class="text-xs text-gray-500">${p.category}</div>
+                        <div class="font-bold text-sm truncate w-32">${p.name}</div>
+                        <div class="font-extrabold mt-1 text-red-500">${formatMoney(p.price)}</div>
+                        <div class="flex items-center border rounded-lg border-gray-200 mt-2 w-max bg-gray-50">
+                            <button onclick="updateCartQty(${index}, -1)" class="px-2.5 py-0.5 text-gray-500 hover:text-black transition">-</button>
+                            <span class="px-3 text-xs font-bold border-x border-gray-200 py-0.5 bg-white">${item.qty}</span>
+                            <button onclick="updateCartQty(${index}, 1)" class="px-2.5 py-0.5 text-gray-500 hover:text-black transition">+</button>
+                        </div>
+                    </div>
+                    <button onclick="removeFromCart(${index})" class="text-gray-400 p-2 hover:text-red-500 transition"><i class="fa-solid fa-trash-can"></i></button>
+                `;
+                container.appendChild(itemEl);
+            });
+        }
+        document.getElementById('cart-total').innerText = formatMoney(total);
+        
+        const checkoutBtn = document.getElementById('checkout-btn');
+        checkoutBtn.innerText = `주문서 작성하기 (${formatMoney(total)})`;
+        checkoutBtn.onclick = () => {
+            if (state.cart.length === 0) {
+                showToast("결제할 상품이 없습니다.");
+                return;
+            }
+            openOrderForm(state.cart, true);
+        };
+        
+        return total;
+    }
+
+    // --- 상호작용 로직 ---
+    function switchHomeSubTab(subTabId) {
+        document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+            btn.classList.remove('sub-nav-active', 'font-bold', 'text-white');
+            btn.classList.add('text-gray-400');
+        });
+        const activeBtn = document.getElementById('sub-tab-' + subTabId);
+        if(activeBtn) {
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('sub-nav-active', 'font-bold', 'text-white');
+        }
+
+        document.querySelectorAll('.home-sub-view').forEach(view => view.classList.add('hidden'));
+        const activeView = document.getElementById('home-' + subTabId);
+        if(activeView) activeView.classList.remove('hidden');
+
+        if (subTabId === 'ranking') renderRanking();
+        if (subTabId === 'sale') renderSale();
+        if (subTabId === 'coupon') {
+            renderCoupons();
+            if (state.hasUnreadCoupons) {
+                state.hasUnreadCoupons = false;
+                saveData();
+            }
+        }
+        if (subTabId === 'message') {
+            renderMessages();
+            if (state.hasUnreadMessages) {
+                state.hasUnreadMessages = false;
+                saveData(); 
+            }
+        }
+    }
+
+    function switchTab(tabId) {
+        if (tabId === 'home') {
+            document.getElementById('home-section-title').classList.add('hidden');
+            document.getElementById('main-banner').classList.remove('hidden');
+            switchHomeSubTab('recommend');
+            renderProducts(null);
+        }
+
+        if(tabId === 'my' || tabId === 'likes' || tabId === 'category') {
+             document.getElementById('main-header').classList.add('hidden');
+        } else {
+             document.getElementById('main-header').classList.remove('hidden');
+        }
+
+        document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+        document.getElementById('view-' + tabId).classList.remove('hidden');
+
+        document.querySelectorAll('.nav-item').forEach(el => {
+            el.classList.remove('active', 'text-white');
+            el.classList.add('text-gray-400');
+        });
+        const activeBtn = document.getElementById('tab-' + tabId);
+        activeBtn.classList.remove('text-gray-400');
+        activeBtn.classList.add('active', 'text-white');
+    }
+
+    function toggleLike(productId) {
+        const index = state.likes.indexOf(productId);
+        if (index > -1) {
+            state.likes.splice(index, 1);
+            showToast("좋아요를 취소했습니다.");
+        } else {
+            state.likes.push(productId);
+            showToast("❤️ 좋아요 목록에 담겼습니다!");
+        }
+        saveData();
+        
+        // 홈 화면에 있다면 전체 리렌더링하여 가로 스크롤에 즉시 반영
+        const isHomeView = !document.getElementById('view-home').classList.contains('hidden');
+        if(isHomeView) {
+            renderProducts(null);
+        } else {
+            renderProducts(); // 기존 렌더러 호출
+        }
+    }
+
+    function addToCart(productId, qty = 1) {
+        const existingItem = state.cart.find(item => item.id === productId);
+        if (existingItem) {
+            existingItem.qty += qty;
+        } else {
+            state.cart.push({ id: productId, qty: qty });
+        }
+        saveData();
+        showToast("🛒 장바구니에 상품을 담았습니다.");
+    }
+
+    function removeFromCart(cartIndex) {
+        state.cart.splice(cartIndex, 1);
+        saveData();
+        renderCart();
+    }
+
+    function filterCategory(category) {
+        document.getElementById('home-section-title').innerText = `${category} 상품`;
+        document.getElementById('home-section-title').classList.remove('hidden');
+        document.getElementById('main-banner').classList.add('hidden');
+        switchHomeSubTab('recommend');
+        renderProducts(category);
+        
+        document.getElementById('main-header').classList.remove('hidden');
+        document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+        document.getElementById('view-home').classList.remove('hidden');
+        
+        document.querySelectorAll('.nav-item').forEach(el => {
+            el.classList.remove('active', 'text-white');
+            el.classList.add('text-gray-400');
+        });
+        const activeBtn = document.getElementById('tab-home');
+        activeBtn.classList.remove('text-gray-400');
+        activeBtn.classList.add('active', 'text-white');
+    }
+
+    let currentDetailQty = 1;
+
+    function changeDetailQty(delta) {
+        currentDetailQty += delta;
+        if(currentDetailQty < 1) currentDetailQty = 1;
+        document.getElementById('detail-qty-display').innerText = currentDetailQty;
+    }
+
+    function openProductDetail(productId) {
+        const p = state.products.find(prod => prod.id === productId);
+        if (!p) return;
+
+        currentDetailQty = 1;
+        document.getElementById('detail-qty-display').innerText = currentDetailQty;
+
+        if (!p.rating) {
+            p.rating = (Math.random() * 1.1 + 3.9).toFixed(1);
+            p.reviews = Math.floor(Math.random() * 990) + 10;
+            p.desc = p.desc || '고객님들께 많은 사랑을 받고 있는 베스트셀러 상품입니다. 한정 수량으로 만나보세요!';
+            saveData();
+        }
+
+        document.getElementById('detail-img').src = p.img;
+        document.getElementById('detail-category').innerText = p.category;
+        document.getElementById('detail-name').innerText = p.name;
+        document.getElementById('detail-price').innerText = formatMoney(p.price);
+        document.getElementById('detail-rating').innerText = p.rating;
+        document.getElementById('detail-reviews').innerText = p.reviews;
+        document.getElementById('detail-description').innerText = p.desc;
+
+        const btnCart = document.getElementById('detail-btn-cart');
+        const btnBuy = document.getElementById('detail-btn-buy');
+
+        btnCart.onclick = () => {
+            addToCart(p.id, currentDetailQty);
+            closeProductDetail();
+        };
+
+        btnBuy.onclick = () => {
+            openOrderForm([{ id: p.id, qty: currentDetailQty }], false);
+        };
+
+        const modal = document.getElementById('product-detail-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => { modal.classList.remove('translate-x-full'); }, 10);
+    }
+
+    function closeProductDetail() {
+        const modal = document.getElementById('product-detail-modal');
+        modal.classList.add('translate-x-full');
+        setTimeout(() => { 
+            modal.classList.add('hidden'); 
+            modal.classList.remove('flex');
+        }, 300);
+    }
+
+    // --- 주문서 (결제) 전용 로직 ---
+    let currentOrderData = {
+        items: [],
+        isFromCart: false,
+        subtotal: 0,
+        discount: 0,
+        usedPoints: 0,
+        total: 0,
+        earnedPoints: 0
+    };
+
+    function selectPaymentMethod(method) {
+        const vBtn = document.getElementById('pay-method-virtual');
+        const tBtn = document.getElementById('pay-method-transfer');
+        if (method === 'virtual') {
+            vBtn.className = "flex-1 py-3 border-2 border-black bg-black text-white rounded-xl text-sm font-bold transition";
+            tBtn.className = "flex-1 py-3 border-2 border-gray-200 text-gray-500 bg-white rounded-xl text-sm font-bold transition hover:bg-gray-50";
+        } else {
+            tBtn.className = "flex-1 py-3 border-2 border-black bg-black text-white rounded-xl text-sm font-bold transition";
+            vBtn.className = "flex-1 py-3 border-2 border-gray-200 text-gray-500 bg-white rounded-xl text-sm font-bold transition hover:bg-gray-50";
+        }
+    }
+
+    function toggleCustomRequest() {
+        const select = document.getElementById('order-request');
+        const customInput = document.getElementById('order-custom-request');
+        if (select.value === '직접입력') {
+            customInput.classList.remove('hidden');
+        } else {
+            customInput.classList.add('hidden');
+        }
+    }
+
+    function openOrderForm(items, fromCart) {
+        if (fromCart) closeCart();
+        else closeProductDetail();
+
+        currentOrderData.items = items;
+        currentOrderData.isFromCart = fromCart;
+        currentOrderData.subtotal = 0;
+        currentOrderData.usedPoints = 0;
+
+        document.getElementById('order-nickname').innerText = state.user.nickname;
+        document.getElementById('order-use-points').value = '';
+        document.getElementById('order-avail-points').innerText = state.points.toLocaleString();
+        
+        const contactInput = document.getElementById('order-contact');
+        if (contactInput) contactInput.value = '';
+
+        const container = document.getElementById('order-items-container');
+        container.innerHTML = '';
+        
+        items.forEach(item => {
+            const p = state.products.find(prod => prod.id === item.id);
+            if(!p) return;
+            currentOrderData.subtotal += (p.price * item.qty);
+            
+            const itemEl = document.createElement('div');
+            itemEl.className = 'flex items-center space-x-3 bg-gray-50 p-2 rounded-xl border border-gray-100';
+            itemEl.innerHTML = `
+                <img src="${p.img}" class="w-14 h-14 rounded-lg object-cover border border-gray-200 shrink-0">
+                <div class="flex-1 overflow-hidden">
+                    <div class="font-bold text-sm truncate text-gray-800">${p.name}</div>
+                    <div class="text-[11px] text-gray-500 mt-0.5">수량: <span class="font-bold text-black">${item.qty}개</span></div>
+                    <div class="font-extrabold text-black mt-0.5 text-sm">${formatMoney(p.price * item.qty)}</div>
+                </div>
+            `;
+            container.appendChild(itemEl);
+        });
+
+        const couponSelect = document.getElementById('order-coupon');
+        couponSelect.innerHTML = '<option value="0" class="text-black">적용 안 함</option>';
+        if (state.user.coupons && state.user.coupons.length > 0) {
+            state.user.coupons.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.discount;
+                opt.innerText = `${c.name} (${c.discount}% 할인)`;
+                opt.className = "text-red-500 font-bold";
+                couponSelect.appendChild(opt);
+            });
+        }
+
+        selectPaymentMethod('virtual');
+        calcOrderTotal();
+
+        const modal = document.getElementById('order-form-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => { modal.classList.remove('translate-y-full'); }, 10);
+    }
+
+    function closeOrderForm() {
+        const modal = document.getElementById('order-form-modal');
+        modal.classList.add('translate-y-full');
+        setTimeout(() => { 
+            modal.classList.add('hidden'); 
+            modal.classList.remove('flex');
+        }, 300);
+    }
+
+    function applyPoints() {
+        let input = parseInt(document.getElementById('order-use-points').value) || 0;
+        if (input < 0) input = 0;
+        
+        if (input > state.points) input = state.points;
+        
+        const couponSelect = document.getElementById('order-coupon');
+        const discountRate = parseInt(couponSelect.value || 0);
+        const discount = Math.floor(currentOrderData.subtotal * (discountRate / 100));
+        const maxUsable = currentOrderData.subtotal - discount;
+        
+        if (input > maxUsable) input = maxUsable;
+        
+        document.getElementById('order-use-points').value = input;
+        calcOrderTotal();
+    }
+
+    function useAllPoints() {
+        const couponSelect = document.getElementById('order-coupon');
+        const discountRate = parseInt(couponSelect.value || 0);
+        const discount = Math.floor(currentOrderData.subtotal * (discountRate / 100));
+        const maxUsable = currentOrderData.subtotal - discount;
+        
+        let use = state.points > maxUsable ? maxUsable : state.points;
+        document.getElementById('order-use-points').value = use;
+        calcOrderTotal();
+    }
+
+    function calcOrderTotal() {
+        const couponSelect = document.getElementById('order-coupon');
+        const discountRate = parseInt(couponSelect.value || 0);
+        
+        currentOrderData.discount = Math.floor(currentOrderData.subtotal * (discountRate / 100));
+        currentOrderData.usedPoints = parseInt(document.getElementById('order-use-points').value) || 0;
+        
+        currentOrderData.total = currentOrderData.subtotal - currentOrderData.discount - currentOrderData.usedPoints;
+        
+        currentOrderData.earnedPoints = Math.floor(currentOrderData.total * 0.05);
+        
+        const btnText = `${formatMoney(currentOrderData.total)} 결제하기`;
+        document.getElementById('order-final-btn-text').innerText = btnText;
+    }
+
+    function submitOrder() {
+        const address = document.getElementById('order-address').value.trim();
+        if (!address) {
+            showToast("배송받으실 주소를 입력해주세요.");
+            document.getElementById('order-address').focus();
+            return;
+        }
+
+        const account = document.getElementById('order-account').value.trim();
+        if (!account) {
+            showToast("본인 계좌 정보를 입력해주세요.");
+            document.getElementById('order-account').focus();
+            return;
+        }
+
+        state.points -= currentOrderData.usedPoints;
+
+        currentOrderData.address = address;
+        currentOrderData.account = account;
+
+        const fpModal = document.getElementById('auth-fingerprint-modal');
+        fpModal.classList.remove('hidden');
+        fpModal.classList.add('flex');
+        setTimeout(() => { fpModal.classList.remove('translate-y-full'); }, 10);
+    }
+
+    // --- 결제 인증 프로세스 로직 ---
+    let currentPasscode = "";
+
+    function passFingerprint() {
+        const fpModal = document.getElementById('auth-fingerprint-modal');
+        const pcModal = document.getElementById('auth-passcode-modal');
+        
+        fpModal.classList.add('translate-y-full');
+        setTimeout(() => {
+            fpModal.classList.add('hidden');
+            fpModal.classList.remove('flex');
+            
+            currentPasscode = "";
+            updatePasscodeDots();
+            pcModal.classList.remove('hidden');
+            pcModal.classList.add('flex');
+            setTimeout(() => { pcModal.classList.remove('translate-x-full'); }, 10);
+        }, 300);
+    }
+
+    function inputPasscode(num) {
+        if (currentPasscode.length < 6) {
+            currentPasscode += num;
+            updatePasscodeDots();
+            
+            if (currentPasscode.length === 6) {
+                setTimeout(processFinalAuth, 300);
+            }
+        }
+    }
+
+    function deletePasscode() {
+        if (currentPasscode.length > 0) {
+            currentPasscode = currentPasscode.slice(0, -1);
+            updatePasscodeDots();
+        }
+    }
+
+    function updatePasscodeDots() {
+        const dots = document.querySelectorAll('.passcode-dot');
+        dots.forEach((dot, index) => {
+            if (index < currentPasscode.length) {
+                dot.classList.remove('bg-gray-200');
+                dot.classList.add('bg-black');
+            } else {
+                dot.classList.remove('bg-black');
+                dot.classList.add('bg-gray-200');
+            }
+        });
+    }
+
+    function closeAuth() {
+        document.getElementById('auth-fingerprint-modal').classList.add('translate-y-full');
+        document.getElementById('auth-passcode-modal').classList.add('translate-x-full');
+        setTimeout(() => {
+            document.getElementById('auth-fingerprint-modal').classList.add('hidden');
+            document.getElementById('auth-passcode-modal').classList.add('hidden');
+        }, 300);
+    }
+
+    function processFinalAuth() {
+        const pcModal = document.getElementById('auth-passcode-modal');
+        const successModal = document.getElementById('auth-success-modal');
+        const loadingDiv = document.getElementById('auth-loading');
+        const checkDiv = document.getElementById('auth-check');
+        
+        pcModal.classList.add('translate-x-full');
+        setTimeout(() => { pcModal.classList.add('hidden'); }, 300);
+        
+        successModal.classList.remove('hidden');
+        successModal.classList.add('flex');
+        loadingDiv.classList.remove('hidden');
+        loadingDiv.classList.add('flex');
+        checkDiv.classList.add('hidden');
+        checkDiv.classList.remove('flex');
+
+        setTimeout(() => {
+            loadingDiv.classList.add('hidden');
+            loadingDiv.classList.remove('flex');
+            checkDiv.classList.remove('hidden');
+            checkDiv.classList.add('flex');
+            
+            setTimeout(() => {
+                successModal.classList.add('hidden');
+                successModal.classList.remove('flex');
+                closeOrderForm(); 
+                
+                if (currentOrderData.isFromCart) {
+                    state.cart = [];
+                    saveData();
+                }
+                
+                sendDepositRequestMessage();
+                switchTab('home');
+            }, 1500);
+        }, 1500);
+    }
+
+    function sendDepositRequestMessage() {
+        const accountInfo = currentOrderData.account;
+        const totalAmount = currentOrderData.total;
+        
+        const firstItem = currentOrderData.items[0];
+        const firstP = state.products.find(p => p.id === firstItem.id);
+        const img = firstP.img;
+        
+        const msgId = generateId();
+        const newMsg = {
+            id: msgId,
+            type: 'deposit_request',
+            img: img,
+            text: `주문이 성공적으로 접수되었습니다. 📝<br><br>결제 완료를 위해 <b>${accountInfo}</b> 계좌로<br><b class="text-red-500 text-lg">${formatMoney(totalAmount)}</b> 입금 부탁드립니다.<br><br><span class="text-[11px] text-gray-500">* 입금 확인 시, 페이크샵 적립금 <b class="text-blue-500">${formatMoney(currentOrderData.earnedPoints)}</b>이 지급됩니다!</span>`,
+            time: Date.now(),
+            orderData: JSON.parse(JSON.stringify(currentOrderData)), 
+            isPaid: false
+        };
+
+        if (!state.messages) state.messages = [];
+        state.messages.push(newMsg);
+        
+        const isHomeView = !document.getElementById('view-home').classList.contains('hidden');
+        const isMessageSubView = !document.getElementById('home-message').classList.contains('hidden');
+        if (!(isHomeView && isMessageSubView)) {
+            state.hasUnreadMessages = true;
+        }
+        
+        saveData();
+        renderMessages();
+        
+        showToast("💬 페이크샵에서 입금 요청 메세지가 도착했습니다.");
+    }
+
+    window.finalizePayment = function(msgId) {
+        const msg = state.messages.find(m => m.id === msgId);
+        if (!msg || msg.isPaid) return;
+
+        state.points += msg.orderData.earnedPoints;
+        
+        let totalQty = 0;
+        msg.orderData.items.forEach(item => {
+            totalQty += item.qty;
+            for(let i=0; i<item.qty; i++) {
+                state.history.push(item.id);
+            }
+        });
+
+        msg.isPaid = true;
+        saveData();
+        renderMessages(); 
+
+        const firstItem = msg.orderData.items[0];
+        const firstP = state.products.find(p => p.id === firstItem.id);
+        const title = totalQty > 1 ? `${firstP.name} 외 ${totalQty - 1}건` : firstP.name;
+        
+        showToast("🎉 입금이 확인되어 결제가 완료되었습니다!");
+        
+        setTimeout(() => {
+            showToast("📦 [페이크샵마켓] 고객님, 상품이 배송 출발했습니다!");
+            addMessage(`입금이 확인되었습니다! 💸<br>페이크샵 적립금 <b>${formatMoney(msg.orderData.earnedPoints)}</b>이 지급되었어요.<br><br>기다리시던 <b>[${title}]</b> 상품이 방금 배송 출발했습니다! 🚚💨<br>곧 고객님 품에 도착할 예정이니 조금만 기다려주세요.`, msg.img);
+        }, 5000);
+        
+        setTimeout(() => {
+            showToast("✅ [배송완료] 고객님이 주문하신 상품이 도착했습니다.");
+            addMessage(`짜잔! 고객님이 주문하신 <b>[${title}]</b> 상품이 무사히 도착했습니다! 🎁<br>오늘도 페이크샵과 함께 즐거운 하루 보내시길 바랄게요.`, msg.img);
+        }, 15000);
+    };
+
+    function showToast(message) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'bg-gray-800 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium toast-animate flex items-center space-x-2 z-[90] relative';
+        toast.innerHTML = `<span>${message}</span>`;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(100%)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 2500);
+    }
+
+    // --- 프로필 수정 관련 ---
+    let tempAvatarBase64 = null;
+
+    function openProfileModal() {
+        document.getElementById('edit-nickname').value = state.user.nickname;
+        tempAvatarBase64 = state.user.avatarUrl;
+        
+        const editEmoji = document.getElementById('edit-avatar-emoji');
+        const editImg = document.getElementById('edit-avatar-img');
+        
+        if (tempAvatarBase64) {
+            editImg.src = tempAvatarBase64;
+            editImg.classList.remove('hidden');
+            editEmoji.classList.add('hidden');
+        } else {
+            editImg.classList.add('hidden');
+            editEmoji.classList.remove('hidden');
+        }
+
+        const modal = document.getElementById('profile-modal');
+        const content = document.getElementById('profile-modal-content');
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('translate-y-full'); }, 10);
+    }
+
+    function closeProfileModal() {
+        const content = document.getElementById('profile-modal-content');
+        content.classList.add('translate-y-full');
+        setTimeout(() => { document.getElementById('profile-modal').classList.add('hidden'); }, 300);
+    }
+
+    function previewAvatar(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                tempAvatarBase64 = e.target.result;
+                const editEmoji = document.getElementById('edit-avatar-emoji');
+                const editImg = document.getElementById('edit-avatar-img');
+                editImg.src = tempAvatarBase64;
+                editImg.classList.remove('hidden');
+                editEmoji.classList.add('hidden');
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function saveProfile() {
+        const newNickname = document.getElementById('edit-nickname').value.trim();
+        if (newNickname) {
+            state.user.nickname = newNickname;
+        }
+        state.user.avatarUrl = tempAvatarBase64;
+        
+        saveData();
+        closeProfileModal();
+        showToast("프로필이 성공적으로 변경되었습니다.");
+    }
+
+    // --- 컬렉션 관련 ---
+    function openCollectionModal() {
+        renderCollection();
+        const modal = document.getElementById('collection-modal');
+        const content = document.getElementById('collection-modal-content');
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('translate-y-full'); }, 10);
+    }
+
+    function closeCollectionModal() {
+        const content = document.getElementById('collection-modal-content');
+        content.classList.add('translate-y-full');
+        setTimeout(() => { document.getElementById('collection-modal').classList.add('hidden'); }, 300);
+    }
+
+    function renderCollection() {
+        const container = document.getElementById('collection-items');
+        container.innerHTML = '';
+        
+        if (state.history.length === 0) {
+            container.innerHTML = `<div class="w-full text-center text-gray-400 py-20 flex flex-col items-center">
+                <i class="fa-solid fa-box-open text-4xl mb-4 text-gray-300"></i>
+                <span class="font-bold">아직 구매한 상품이 없습니다.</span>
+                <span class="text-sm mt-2">멋진 상품을 구매하고 컬렉션을 채워보세요!</span>
+            </div>`;
+            return;
+        }
+
+        [...state.history].reverse().forEach((id, index) => {
+            const p = state.products.find(prod => prod.id === id);
+            if (!p) return;
+
+            const card = document.createElement('div');
+            card.className = 'flex flex-col bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition mb-3 w-full';
+            card.onclick = () => { closeCollectionModal(); openProductDetail(p.id); };
+            
+            const date = new Date();
+            date.setDate(date.getDate() - Math.floor(index / 2));
+            const dateString = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+
+            card.innerHTML = `
+                <div class="flex items-start space-x-3 w-full">
+                    <img src="${p.img}" class="w-20 h-20 rounded-lg object-cover border border-gray-200 shrink-0">
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-[10px] font-bold text-gray-400">${dateString} 획득</span>
+                            <span class="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full"><i class="fa-solid fa-gem mr-1"></i>컬렉션 보관중</span>
+                        </div>
+                        <div class="font-bold text-sm truncate mb-1">${p.name}</div>
+                        <div class="font-extrabold text-black text-sm">${formatMoney(p.price)}</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-[12px] text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 italic break-keep leading-relaxed">
+                    "${p.desc}"
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // --- 서브 탭 기능 (콘텐츠, 랭킹, 세일, 쿠폰) ---
+    function analyzeHabits() {
+        if (state.history.length === 0) {
+            document.getElementById('habit-result').innerHTML = `
+                <div class="mt-4 p-5 bg-white rounded-xl text-gray-500 border border-gray-200 shadow-sm">
+                    아직 구매 내역이 없습니다.<br>쇼핑을 시작하고 소비 패턴을 알아보세요!
+                </div>`;
+            return;
+        }
+
+        let totalSpent = 0;
+        let catCount = {};
+
+        state.history.forEach(id => {
+            const p = state.products.find(prod => prod.id === id);
+            if (p) {
+                totalSpent += p.price;
+                catCount[p.category] = (catCount[p.category] || 0) + 1;
+            }
+        });
+
+        let favoriteCat = Object.keys(catCount).reduce((a, b) => catCount[a] > catCount[b] ? a : b);
+
+        let feedbackMsg = "";
+        switch(favoriteCat) {
+            case '패션': feedbackMsg = "이번 달은 옷 지출이 많아요!<br>옷장에 있는 옷들을 활용해 보시는 건 어때요?"; break;
+            case '인테리어소품': feedbackMsg = "인테리어 소품을 많이 모으셨네요!<br>방 분위기가 한층 더 감성적으로 변했을 것 같아요."; break;
+            case '식료품': feedbackMsg = "맛있는 먹거리에 투자를 많이 하셨군요!<br>먹는 즐거움이 최고지만, 냉장고 파먹기도 잊지 마세요."; break;
+            case '가전제품': feedbackMsg = "스마트한 삶을 위한 가전 지출이 1위!<br>삶의 질이 수직 상승 중이시겠어요."; break;
+            case '화장품': feedbackMsg = "뷰티템에 관심이 가장 많으시군요!<br>오늘 더 눈부시게 빛나는 하루가 될 거예요."; break;
+            default: feedbackMsg = "다양한 분야에 호기심이 많으신 스마트 쇼퍼!<br>나만의 유니크한 취향을 즐겨보세요.";
+        }
+
+        document.getElementById('habit-result').innerHTML = `
+            <div class="mt-4 p-5 bg-white rounded-xl text-left border border-blue-100 shadow-sm animate-fade-in flex flex-col space-y-3">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <span class="text-gray-500 text-sm font-bold">누적 지출 금액</span>
+                    <span class="text-xl font-extrabold text-black">${formatMoney(totalSpent)}</span>
+                </div>
+                <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span class="text-gray-500 text-sm font-bold">최애 카테고리</span>
+                    <span class="text-sm font-extrabold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">${favoriteCat} <i class="fa-solid fa-heart text-xs"></i></span>
+                </div>
+                <div class="pt-1">
+                    <p class="text-[13px] text-gray-700 leading-relaxed font-medium bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                        💡 ${feedbackMsg}
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderRanking() {
+        const container = document.getElementById('ranking-grid');
+        container.innerHTML = '';
+
+        let sorted = [...state.products]
+            .filter(p => !p.isSale) 
+            .sort((a, b) => parseFloat(b.rating || 4.0) - parseFloat(a.rating || 4.0));
+
+        sorted.slice(0, 10).forEach((p, index) => {
+            const card = document.createElement('div');
+            card.className = 'flex items-center space-x-4 bg-white p-3 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition';
+            card.onclick = () => openProductDetail(p.id);
+            
+            const medalColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-amber-600' : 'text-gray-300';
+            
+            card.innerHTML = `
+                <div class="font-black text-2xl w-6 text-center ${medalColor}">${index + 1}</div>
+                <img src="${p.img}" class="w-16 h-16 rounded-lg object-cover border border-gray-200">
+                <div class="flex-1 overflow-hidden">
+                    <div class="text-xs text-gray-500 mb-1">${p.category}</div>
+                    <div class="font-bold text-sm truncate mb-1">${p.name}</div>
+                    <div class="flex items-center justify-between">
+                        <div class="font-extrabold text-black">${formatMoney(p.price)}</div>
+                        <div class="text-xs text-yellow-500 font-bold"><i class="fa-solid fa-star"></i> ${p.rating}</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function renderSale() {
+        const grid = document.getElementById('sale-grid');
+        grid.innerHTML = '';
+        
+        const saleItems = state.products.filter(p => p.isSale);
+        
+        saleItems.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-sm border border-red-100 overflow-hidden relative pb-3 cursor-pointer group';
+            card.onclick = () => openProductDetail(p.id);
+            card.innerHTML = `
+                <div class="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg z-10 tracking-widest shadow-sm">SALE 특가</div>
+                <div class="relative w-full h-40 bg-gray-200">
+                    <img src="${p.img}" class="w-full h-full object-cover transition transform group-hover:scale-105">
+                </div>
+                <div class="px-3 pt-3">
+                    <div class="text-sm font-bold truncate mb-1">${p.name}</div>
+                    <div class="text-xs text-gray-400 line-through mb-1">${formatMoney(p.originalPrice)}</div>
+                    <div class="text-lg font-extrabold text-red-500 flex justify-between items-center">
+                        ${formatMoney(p.price)}
+                        <button onclick="event.stopPropagation(); addToCart('${p.id}')" class="text-black p-1 hover:bg-gray-100 rounded-full transition"><i class="fa-solid fa-cart-plus"></i></button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function renderCoupons() {
+        const container = document.getElementById('coupon-list');
+        container.innerHTML = '';
+        
+        generatedCoupons.forEach(c => {
+            const isDownloaded = state.user.coupons.some(myC => myC.id === c.id);
+            
+            const card = document.createElement('div');
+            card.className = `p-5 rounded-2xl border-2 flex justify-between items-center bg-white ${isDownloaded ? 'opacity-60 border-gray-200' : 'border-black shadow-md'}`;
+            
+            card.innerHTML = `
+                <div>
+                    <div class="text-xs text-gray-500 font-bold mb-1">페이크샵 단독</div>
+                    <div class="font-extrabold text-lg flex items-center space-x-2">
+                        <span class="text-red-500">${c.discount}%</span>
+                        <span class="text-black">${c.name}</span>
+                    </div>
+                </div>
+                <button ${isDownloaded ? 'disabled' : ''} onclick="downloadCoupon('${c.id}')" class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isDownloaded ? 'bg-gray-200 text-gray-400' : 'bg-black text-white hover:scale-105 shadow-md transition'}">
+                    <i class="fa-solid ${isDownloaded ? 'fa-check' : 'fa-download'} text-lg"></i>
+                </button>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function downloadCoupon(couponId) {
+        const coupon = generatedCoupons.find(c => c.id === couponId);
+        if(!coupon) return;
+        
+        if(!state.user.coupons) state.user.coupons = [];
+        state.user.coupons.push(coupon);
+        saveData();
+        
+        showToast(`🎉 ${coupon.discount}% 쿠폰 발급 완료! 마이 탭에서 확인하세요.`);
+        renderCoupons(); 
+    }
+
+    // --- 마이페이지 쿠폰 모달 ---
+    function openMyCouponsModal() {
+        const container = document.getElementById('my-coupons-list');
+        container.innerHTML = '';
+
+        if (!state.user.coupons || state.user.coupons.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-20 text-gray-400 flex flex-col items-center">
+                    <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-ticket text-gray-400"></i></div>
+                    <span class="font-bold">보유한 쿠폰이 없습니다.</span>
+                    <span class="text-sm mt-2">홈 > 쿠폰 탭에서 다운로드 받아보세요!</span>
+                </div>
+            `;
+        } else {
+            state.user.coupons.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'p-5 rounded-2xl border-2 border-red-400 bg-red-50 flex flex-col relative overflow-hidden shadow-sm';
+                card.innerHTML = `
+                    <div class="absolute -right-6 -top-6 w-24 h-24 bg-red-100 rounded-full opacity-60"></div>
+                    <div class="absolute -left-4 -bottom-4 w-12 h-12 bg-red-100 rounded-full opacity-60"></div>
+                    <div class="text-[10px] text-red-500 font-bold mb-1 tracking-wider relative z-10 border border-red-200 inline-block w-max px-2 py-0.5 rounded-full bg-white">결제 시 무조건 적용</div>
+                    <div class="font-extrabold text-2xl flex items-center space-x-2 relative z-10 mt-2">
+                        <span class="text-red-600">${c.discount}% 할인 혜택</span>
+                    </div>
+                    <div class="text-sm font-bold text-gray-700 mt-1 relative z-10">${c.name}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        const modal = document.getElementById('my-coupons-modal');
+        const content = document.getElementById('my-coupons-content');
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('translate-y-full'); }, 10);
+    }
+
+    function closeMyCouponsModal() {
+        const content = document.getElementById('my-coupons-content');
+        content.classList.add('translate-y-full');
+        setTimeout(() => { document.getElementById('my-coupons-modal').classList.add('hidden'); }, 300);
+    }
+
+    // --- 메시지 관련 로직 ---
+    function addMessage(text, imgUrl = null) {
+        if (!state.messages) state.messages = [];
+        state.messages.push({
+            id: generateId(),
+            type: 'normal',
+            text: text,
+            img: imgUrl,
+            time: Date.now()
+        });
+        
+        const isHomeView = !document.getElementById('view-home').classList.contains('hidden');
+        const isMessageSubView = !document.getElementById('home-message').classList.contains('hidden');
+        if (!(isHomeView && isMessageSubView)) {
+            state.hasUnreadMessages = true;
+        }
+
+        saveData();
+        renderMessages();
+    }
+
+    function renderMessages() {
+        const container = document.getElementById('message-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="self-center text-xs text-gray-400 mb-2 mt-2">오늘</div>
+            <div class="flex items-start space-x-2">
+                <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white shrink-0"><i class="fa-solid fa-shop text-xs"></i></div>
+                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 max-w-[75%] text-gray-700 leading-relaxed">
+                    안녕하세요 고객님! ✨<br>페이크샵을 이용해주셔서 진심으로 감사드립니다.
+                </div>
+            </div>
+            <div class="flex items-start space-x-2">
+                <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white shrink-0"><i class="fa-solid fa-shop text-xs"></i></div>
+                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 max-w-[75%] text-gray-700 leading-relaxed">
+                    현재 창고 대방출 <b>[세일]</b> 탭에서 파격적인 할인을 진행 중입니다! 상단 <b>[쿠폰]</b> 탭에서 랜덤 할인 쿠폰도 잊지 말고 다운로드 받으세요! 🎁
+                </div>
+            </div>
+        `;
+
+        if (state.messages && state.messages.length > 0) {
+            state.messages.forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.className = 'flex items-start space-x-2 animate-fade-in mt-4';
+                
+                const imgHtml = msg.img ? `<img src="${msg.img}" class="w-full h-32 object-cover rounded-lg mb-2 border border-gray-100">` : '';
+                
+                if (msg.type === 'deposit_request') {
+                    const btnHtml = msg.isPaid 
+                        ? `<button disabled class="w-full mt-3 bg-gray-200 text-gray-400 py-3 rounded-xl font-bold text-sm">입금 확인됨</button>`
+                        : `<button onclick="finalizePayment('${msg.id}')" class="w-full mt-3 bg-black text-white py-3 rounded-xl font-bold text-sm shadow-md hover:bg-gray-800 transition">입금완료</button>`;
+                        
+                    msgEl.innerHTML = `
+                        <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white shrink-0"><i class="fa-solid fa-shop text-xs"></i></div>
+                        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 w-64 text-gray-700 leading-relaxed">
+                            ${imgHtml}
+                            ${msg.text}
+                            ${btnHtml}
+                        </div>
+                    `;
+                } else {
+                    msgEl.innerHTML = `
+                        <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white shrink-0"><i class="fa-solid fa-shop text-xs"></i></div>
+                        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 max-w-[75%] text-gray-700 leading-relaxed">
+                            ${imgHtml}
+                            ${msg.text}
+                        </div>
+                    `;
+                }
+                container.appendChild(msgEl);
+            });
+        }
+
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 50);
+    }
+
+    // --- 기업 설명 모달 로직 ---
+    function openCompanyInfo() {
+        const modal = document.getElementById('company-info-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        
+        // 렌더링 후 애니메이션 클래스 트리거를 위한 딜레이
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modal.classList.add('opacity-100');
+        }, 10);
+    }
+
+    function closeCompanyInfo() {
+        const modal = document.getElementById('company-info-modal');
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        
+        setTimeout(() => {
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }, 500); // transition duration과 동일하게 맞춤
+    }
+
+    // --- API 재시도 로직 (Exponential Backoff) ---
+    async function fetchWithRetry(url, options, maxRetries = 5) {
+        let retries = 0;
+        const delays = [1000, 2000, 4000, 8000, 16000];
+        
+        while (retries < maxRetries) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                retries++;
+                if (retries >= maxRetries) throw error;
+                await new Promise(resolve => setTimeout(resolve, delays[retries - 1]));
+            }
+        }
+    }
+
+    // --- 카테고리 자동 분류 함수 ---
+    function categorizeProduct(input) {
+        const keyword = input.toLowerCase();
+        const categories = {
+            '패션': ['옷', '바지', '티셔츠', '자켓', '코트', '신발', '운동화', '가방', '지갑', '모자', '원피스', '셔츠', '스니커즈', '패딩', '치마', '백', '구두', '니트', '에코백', '토트백', '안경', '선글라스'],
+            '인테리어소품': ['책상', '의자', '스탠드', '조명', '액자', '침대', '커튼', '러그', '소파', '테이블', '선반', '무드등', '쿠션', '시계', '인센스', '화병', '디퓨저'],
+            '식료품': ['밥', '빵', '과자', '물', '음료', '커피', '그래놀라', '사과', '밀키트', '라면', '고기', '우유', '케이크', '초콜릿', '주스', '아이스크림', '샐러드', '와인', '영양제'],
+            '가전제품': ['tv', '티비', '냉장고', '세탁기', '에어컨', '청소기', '헤드폰', '이어폰', '컴퓨터', '노트북', '스마트폰', '마우스', '키보드', '스피커', '카메라', '모니터', '턴테이블', '패드', '워치', '충전기', '케이블'],
+            '화장품': ['스킨', '로션', '립스틱', '파운데이션', '향수', '선크림', '크림', '앰플', '마스크팩', '샴푸', '바디워시', '틴트', '섀도우', '쿠션', '블러셔', '립밤']
+        };
+
+        for (const [category, keywords] of Object.entries(categories)) {
+            if (keywords.some(kw => keyword.includes(kw))) {
+                return category;
+            }
+        }
+        return '그 외';
+    }
+
+    // --- AI 상품 생성 로직 (나노바나나 / 제미나이 연동) ---
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('search-input').value.trim();
+        if (!input) return;
+
+        document.getElementById('search-input').blur(); 
+        
+        document.getElementById('loading-overlay').classList.remove('hidden');
+        document.getElementById('loading-overlay').classList.add('flex');
+
+        try {
+            const promptText = "쇼핑몰 상품 사진, 단일 상품, 깨끗한 단색 배경, 고화질 프로페셔널 조명: " + input;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+            
+            const payload = {
+                instances: { prompt: promptText },
+                parameters: { sampleCount: 1 }
+            };
+
+            const data = await fetchWithRetry(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!data.predictions || !data.predictions[0]) {
+                throw new Error("이미지 생성 결과가 없습니다.");
+            }
+
+            const imageUrl = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+            
+            const randomPrice = Math.floor(Math.random() * 90 + 10) * 1000;
+            const matchedCategory = categorizeProduct(input);
+            
+            const newProduct = {
+                id: generateId(),
+                name: input,
+                price: randomPrice,
+                category: matchedCategory,
+                img: imageUrl,
+                desc: `'${input}' 검색 결과로 생성된 세상에 단 하나뿐인 가상 상품입니다. 트렌디한 감각과 놀라운 디테일을 확인해 보세요!`,
+                rating: (Math.random() * 1.1 + 3.9).toFixed(1),
+                reviews: Math.floor(Math.random() * 500) + 1
+            };
+
+            state.products.unshift(newProduct);
+            saveData();
+            
+            document.getElementById('home-section-title').innerText = `'${input}' 검색 결과`;
+            document.getElementById('main-banner').classList.add('hidden');
+            renderProducts(null, [newProduct]);
+            
+            showToast("✨ 세상에 없던 상품이 준비되었습니다!");
+
+        } catch (error) {
+            console.error(error);
+            showToast("상품 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        } finally {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('loading-overlay').classList.remove('flex');
+            document.getElementById('search-input').value = '';
+        }
+    });
+
+    // 시작
+    window.onload = init;
+
+</script>
+</body>
+</html>
